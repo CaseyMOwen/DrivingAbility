@@ -5,6 +5,7 @@ import requests.auth
 import pandas as pd
 from anyascii import anyascii
 import csv
+import os.path
 
 # Request a new token, that lasts for one day. Record it to the access token json file
 def request_token():
@@ -19,6 +20,7 @@ def request_token():
 
 # Trys to request data, with error handling. If token is expired, request a new one once, otherwise error
 def try_request(url, headers, params, first_try=True):
+    
     try:
         response = requests.get(url, headers=headers, params=params)
         response.raise_for_status()
@@ -42,6 +44,8 @@ def try_request(url, headers, params, first_try=True):
 # retrieve_token()
 def get_subreddit_posts(subreddit):
     # TODO: OOP, make token a class variable so don't have to open this file everytime
+    if not os.path.isfile("access_token.json"):
+        request_token()
     token_file = open('access_token.json')
     token_data = json.load(token_file)
     token = token_data['access_token']
