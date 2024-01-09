@@ -70,14 +70,15 @@ def posts_json_to_df(posts_json):
     df = pd.json_normalize(posts)
     
     # print(list(df.columns))
-    columns_to_project = ['data.subreddit', 'data.created_utc', 'data.title', 'data.id', 'data.selftext']
+    df.columns = [col.replace('data.', '') for col in df.columns]
+    df['cleanselftext'] = df.apply(lambda row: anyascii(row['selftext']), axis=1)
+    df['cleantitle'] = df.apply(lambda row: anyascii(row['title']), axis=1)
+    columns_to_project = ['subreddit', 'created_utc', 'cleantitle', 'id', 'cleanselftext']
     projected_df = df[columns_to_project]
-    projected_df.columns = [col.replace('data.', '') for col in projected_df.columns]
-    projected_df['selftext'] = projected_df['selftext'].map(lambda text: anyascii(text))
-    projected_df['title'] = projected_df['title'].map(lambda text: anyascii(text))
+    renamed_df = projected_df.rename(columns={'cleanselftext':'selftext', 'cleantitle': 'title'})
     # print(projected_df)
     # projected_df.to_csv('post_data.csv')
-    return projected_df
+    return renamed_df
 
 def collect_all_data():
     states_dict = create_states_dict()
