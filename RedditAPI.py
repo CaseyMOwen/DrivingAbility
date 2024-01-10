@@ -76,8 +76,13 @@ class RedditAPI:
         r = self.try_request(base_url+'/r/'+subreddit+'/'+ sort_by + '.json',headers=headers, params=params)
         r_json = r.json()
         next_after = r_json["data"]["after"]
+        next_before = r_json["data"]["before"]
+        # if next_after == 'null':
+        #     next_after = None
+        # if next_before == 'null':
+        #     next_before = None
         df = self.posts_json_to_df(r_json, subreddit)
-        return df, next_after
+        return df, next_after, next_before
 
     def posts_json_to_df(self, posts_json, subreddit):
         posts = posts_json["data"]["children"]
