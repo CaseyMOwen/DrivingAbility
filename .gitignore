@@ -3,3 +3,4 @@ config.py
 *.csv
 !CitySubreddits.csv
 !StateSubreddits.csv
+venv

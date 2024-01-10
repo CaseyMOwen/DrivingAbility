@@ -11,7 +11,7 @@ import datetime
 class RedditAPI:
     token_filename = "Reddit_Access_Token.json"
 
-    def __init__(self, reddit_username, reddit_password, client_id,         client_secret, user_agent):
+    def __init__(self, reddit_username, reddit_password, client_id, client_secret, user_agent):
         self.reddit_username = reddit_username
         self.reddit_password = reddit_password
         self.client_id = client_id
@@ -63,15 +63,15 @@ class RedditAPI:
         return response
 
     # retrieve_token()
-    def get_subreddit_posts(self, subreddit,sort_by='new', limit=100, af):
+    def get_subreddit_posts(self, subreddit, after, sort_by='new', limit=100 ):
         headers = {"Authorization": "bearer " + self.token, "User-Agent": config.user_agent}
         params = {'raw_json': 1, 'limit': limit}
         base_url = 'https://oauth.reddit.com'
         r = self.try_request(base_url+'/r/'+subreddit+'/'+ sort_by + '.json',headers=headers, params=params)
         r_json = r.json()
-        after = r_json["data"]["after"]
+        next_after = r_json["data"]["after"]
         df = self.posts_json_to_df(r_json)
-        return df, after
+        return df, next_after
 
     def posts_json_to_df(self, posts_json):
         posts = posts_json["data"]["children"]
