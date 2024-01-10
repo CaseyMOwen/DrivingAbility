@@ -63,20 +63,28 @@ class RedditAPI:
         return response
 
     # retrieve_token()
-    def get_subreddit_posts(self, subreddit, after, sort_by='new', limit=100 ):
+    def get_subreddit_posts(self, subreddit, after=None, before=None, sort_by='new', limit=100):
         headers = {"Authorization": "bearer " + self.token, "User-Agent": config.user_agent}
         params = {'raw_json': 1, 'limit': limit}
+        if before is not None and after is not None:
+            raise Exception("Only one of before and after can be set at a time")
+        elif after is not None:
+            params['after'] = after
+        elif before is not None:
+            params['before'] = before
         base_url = 'https://oauth.reddit.com'
         r = self.try_request(base_url+'/r/'+subreddit+'/'+ sort_by + '.json',headers=headers, params=params)
         r_json = r.json()
         next_after = r_json["data"]["after"]
-        df = self.posts_json_to_df(r_json)
+        df = self.posts_json_to_df(r_json, subreddit)
         return df, next_after
 
-    def posts_json_to_df(self, posts_json):
+    def posts_json_to_df(self, posts_json, subreddit):
         posts = posts_json["data"]["children"]
         df = pd.json_normalize(posts)
         df.columns = [col.replace('data.', '') for col in df.columns]
+        df = df.drop('subreddit', axis=1)
+        df['subreddit'] = subreddit
         # df['cleanselftext'] = df.apply(lambda row: anyascii(row['selftext']), axis=1)
         # df['cleantitle'] = df.apply(lambda row: anyascii(row['title']), axis=1)
         # columns_to_project = ['subreddit', 'created_utc', 'cleantitle', 'id', 'cleanselftext']
