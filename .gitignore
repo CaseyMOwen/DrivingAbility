@@ -4,3 +4,4 @@ config.py
 !CitySubreddits.csv
 !StateSubreddits.csv
 venv
+*.parquet

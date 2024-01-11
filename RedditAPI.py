@@ -4,7 +4,6 @@ import config
 import requests.auth
 import pandas as pd
 from anyascii import anyascii
-import csv
 import os.path
 import datetime
 
@@ -76,7 +75,7 @@ class RedditAPI:
         r = self.try_request(base_url+'/r/'+subreddit+'/'+ sort_by + '.json',headers=headers, params=params)
         r_json = r.json()
         next_after = r_json["data"]["after"]
-        next_before = r_json["data"]["before"]
+        next_before = r_json["data"]["children"][0]['data']['id']
         # if next_after == 'null':
         #     next_after = None
         # if next_before == 'null':
@@ -84,19 +83,53 @@ class RedditAPI:
         df = self.posts_json_to_df(r_json, subreddit)
         return df, next_after, next_before
 
+    
+    
+
+    def get_post_comments(self, subreddit, id, sort_by='top', limit=100, depth=10):
+        headers = {"Authorization": "bearer " + self.token, "User-Agent": config.user_agent}
+        params = {'raw_json': 1, 'limit': limit, 'depth': depth}
+        base_url = 'https://oauth.reddit.com'
+        r = self.try_request(base_url+'/r/'+subreddit+'/comments/'+ id + '/' + sort_by + '.json', headers=headers, params=params)
+        r_json = r.json()
+        root_comments = r_json[1]['data']['children']
+        comment_dfs = []
+        for root in root_comments:
+            comment_df = self.get_comment_and_replies(root, subreddit)
+            comment_dfs.append(comment_df)
+        all_comments_df = pd.concat(comment_dfs)
+        all_comments_df['parent_id'] = id
+        all_comments_df['subreddit'] = subreddit
+        return all_comments_df
+
+
+    def get_comment_and_replies(self, comment_tree, subreddit):      
+        if 'body' in comment_tree['data'] and 'created_utc' in comment_tree['data']:
+            comment_text = comment_tree['data']['body']
+            utc = comment_tree['data']['created_utc']
+            d = {'id': comment_tree['data']['id'], 'text': anyascii(comment_text), 'created_utc': datetime.datetime.fromtimestamp(utc)}
+            comment_df = pd.DataFrame(d, index=[0])
+        else:
+            # Case where fields necessary to the comment and text are missing
+            comment_df = None
+        if 'replies' not in comment_tree['data'] or comment_tree['data']['replies'] == "":
+            # Case where there are no replies (bottom level comment), or replies field is missing
+            return comment_df
+        else:
+            replies = comment_tree['data']['replies']
+            reply_dfs = []
+            for reply in replies['data']['children']:
+                reply_df = self.get_comment_and_replies(reply, subreddit)
+                reply_dfs.append(reply_df)
+            reply_dfs.append(comment_df)
+            return pd.concat(reply_dfs)
+
     def posts_json_to_df(self, posts_json, subreddit):
         posts = posts_json["data"]["children"]
         df = pd.json_normalize(posts)
         df.columns = [col.replace('data.', '') for col in df.columns]
         df = df.drop('subreddit', axis=1)
         df['subreddit'] = subreddit
-        # df['cleanselftext'] = df.apply(lambda row: anyascii(row['selftext']), axis=1)
-        # df['cleantitle'] = df.apply(lambda row: anyascii(row['title']), axis=1)
-        # columns_to_project = ['subreddit', 'created_utc', 'cleantitle', 'id', 'cleanselftext']
-        # projected_df = df[columns_to_project]
-        # renamed_df = projected_df.rename(columns={'cleanselftext':'selftext', 'cleantitle': 'title'})
-        # print(projected_df)
-        # projected_df.to_csv('post_data.csv')
         return df
     
     def clean_text_columns(self, df, columnnames):
@@ -113,6 +146,7 @@ class RedditAPI:
     def convert_timestamps(self, df, time_col_name = 'created_utc'):
         pd.options.mode.chained_assignment = None
         df[time_col_name] = df.loc[:, [time_col_name]].map(lambda timestamp: datetime.datetime.fromtimestamp(timestamp))
+        # df[time_col_name] = pd.to_datetime(df[time_col_name], unit='s')
         pd.options.mode.chained_assignment = 'warn'
         return df
     
