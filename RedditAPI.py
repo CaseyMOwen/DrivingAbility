@@ -85,10 +85,17 @@ class RedditAPI:
 
     
     
+    # def get_all_post_comments(self, subreddit, id, sort_by='top', max_calls):
+    #     call_count = 0
+    #     hit_max_history = False
+    #     dfs = [None] * max_calls
+    #     while call_count < max_calls and not hit_max_history:
+    #         df = 
+    #         dfs[call_count]
 
-    def get_post_comments(self, subreddit, id, sort_by='top', limit=100, depth=10):
+    def get_limited_post_comments(self, subreddit, id, sort_by='top', limit=100):
         headers = {"Authorization": "bearer " + self.token, "User-Agent": config.user_agent}
-        params = {'raw_json': 1, 'limit': limit, 'depth': depth}
+        params = {'raw_json': 1, 'limit': limit}
         base_url = 'https://oauth.reddit.com'
         r = self.try_request(base_url+'/r/'+subreddit+'/comments/'+ id + '/' + sort_by + '.json', headers=headers, params=params)
         r_json = r.json()

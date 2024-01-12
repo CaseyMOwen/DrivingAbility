@@ -126,11 +126,12 @@ small_states_dict = {'Texas': 'texas', 'California': 'california'}
 
 # one_state_dict ={'Texas': 'texas'}
 
+states_dict = q.create_states_dict()
 
-# q.get_older_posts(small_states_dict, max_calls_per_subreddit=12)
-# df = pd.read_parquet(q.posts_data_file)
-# print(df['id'].is_unique)
-# print(df[df[['id']].duplicated() == True])
+q.get_older_posts(states_dict, max_calls_per_subreddit=12)
+df = pd.read_parquet(q.posts_data_file)
+print(df['id'].is_unique)
+print(df[df[['id']].duplicated() == True])
 
 
 # df = pd.read_parquet("test_post_data.parquet")
@@ -143,5 +144,5 @@ small_states_dict = {'Texas': 'texas', 'California': 'california'}
 # print(new_df['id'].is_unique)
 # print(new_df[new_df[['id']].duplicated() == True])
 
-df = q.reddit.get_post_comments(subreddit='Connecticut', id='1938uqq')
-print(df)
+# df = q.reddit.get_limited_post_comments(subreddit='Connecticut', id='1938uqq')
+# print(df)
