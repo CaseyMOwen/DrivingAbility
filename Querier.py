@@ -117,21 +117,21 @@ class Querier:
 
 
 
-q = Querier()
+# q = Querier()
 
-small_states_dict = {'Texas': 'texas', 'California': 'california'}
-# q.get_older_posts(small_states_dict, max_calls_per_subreddit=2)
-# df = q.read_posts_data()
-# q.get_older_posts(small_states_dict, max_calls_per_subreddit=2, existing_df=df)
+# small_states_dict = {'Texas': 'texas', 'California': 'california'}
+# # q.get_older_posts(small_states_dict, max_calls_per_subreddit=2)
+# # df = q.read_posts_data()
+# # q.get_older_posts(small_states_dict, max_calls_per_subreddit=2, existing_df=df)
 
-# one_state_dict ={'Texas': 'texas'}
+# # one_state_dict ={'Texas': 'texas'}
 
-states_dict = q.create_states_dict()
+# states_dict = q.create_states_dict()
 
-q.get_older_posts(states_dict, max_calls_per_subreddit=12)
-df = pd.read_parquet(q.posts_data_file)
-print(df['id'].is_unique)
-print(df[df[['id']].duplicated() == True])
+# q.get_older_posts(states_dict, max_calls_per_subreddit=12)
+# df = pd.read_parquet(q.posts_data_file)
+# print(df['id'].is_unique)
+# print(df[df[['id']].duplicated() == True])
 
 
 # df = pd.read_parquet("test_post_data.parquet")

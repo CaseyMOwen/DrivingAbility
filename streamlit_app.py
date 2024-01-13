@@ -2,22 +2,28 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from st_files_connection import FilesConnection
+import Visualizations
+import streamlit_folium as sf
 
 # Create connection object and retrieve file contents.
 # Specify input format is a csv and to cache the result for 600 seconds.
 conn = st.connection('s3', type=FilesConnection)
-df = conn.read("caseyowendrivingdata/post_data.parquet", input_format="parquet")
+# df = conn.read("caseyowendrivingdata/post_data.parquet", input_format="parquet")
+df = pd.read_parquet('post_data.parquet')
 
 # Print results.
-print(df.iloc[:1])
+# print(df.iloc[:1])
 st.write(df.iloc[:1])
 st.write(df)
 
+# id_list = df.groupby("subreddit").count()['id']
+# print(id_list)
 
 
 st.title('Reddit Driving Confidence vs. Ability')
 
-
+m = Visualizations.create_Choropleth()
+st_data = sf.folium_static(m)
 
 
 
