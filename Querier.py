@@ -3,6 +3,8 @@ import config
 import pandas as pd
 import csv
 import os.path
+import praw
+from anyascii import anyascii
 
 class Querier:
     posts_data_file = 'post_data.parquet'
@@ -115,7 +117,10 @@ class Querier:
         filtered_df = df.loc[df['subreddit'] == subreddit]
         return filtered_df['id'].loc[filtered_df['created_utc'].idxmax()]
 
-
+# q = Querier()
+# # df = q.praw_get_posts_and_comments("texas",limit=5)
+# df = q.praw_get_comments('196elwq')
+# print(df)
 
 # q = Querier()
 
