@@ -1,7 +1,7 @@
 import pandas as pd
 import folium
 import json
-import Querier
+import csv
 
 def create_Choropleth():
     cp_df = create_choropleth_data()
@@ -12,12 +12,12 @@ def create_Choropleth():
     geo_data=state_geo,
     name="choropleth",
     data=cp_df,
-    columns=["State", "Number of Posts"],
+    columns=["State", "Average Score"],
     key_on="feature.properties.name",
     fill_color="YlGn",
     fill_opacity=0.7,
     line_opacity=0.2,
-    legend_name="Number of Posts Retrieved",
+    legend_name="Average Score",
     ).add_to(m)
 
     # m.save("state_choropleth.html")
@@ -25,20 +25,30 @@ def create_Choropleth():
     return m
 
 def create_choropleth_data():
-    q = Querier.Querier()
-    states_dict = q.create_states_dict()
+    states_dict = create_states_dict()
     inv_states_dict = {v: k for k, v in states_dict.items()}
-    df = pd.read_parquet('post_data.parquet')
+    df = pd.read_parquet('scored_post_data.parquet')
     df['State'] = df['subreddit'].map(inv_states_dict)
-    cp_df = df.groupby("State").count()['id'].reset_index(name="Number of Posts")
+    grouped = df.groupby("State")
+    cp_df = grouped['sum_score'].mean().reset_index(name="Average Score")
+    # print(df.groupby("State").count().reset_index())
+    # print(df)
+    # print(df.value_counts("State"))
+    num_posts = df.value_counts("State").reset_index(name='Number of Posts')
+    cp_df = cp_df.merge(num_posts, on='State')
     return cp_df
 
 def add_choropleth_tooltip(cp_df, cp, m):
     cp_df_state_indexed = cp_df.set_index('State')
     for state in cp.geojson.data['features']:
         state_name = state['properties']['name']
-        state['properties']['number of posts'] = float(cp_df_state_indexed.loc[state_name, 'Number of Posts'])
-    folium.GeoJsonTooltip(['name', 'number of posts']).add_to(cp.geojson)
+        if state_name in cp_df_state_indexed.index:
+            state['properties']['average score'] = float(cp_df_state_indexed.loc[state_name, 'Average Score'])
+            state['properties']['number of posts'] = float(cp_df_state_indexed.loc[state_name, 'Number of Posts'])
+        else:
+            state['properties']['average score'] = 0
+            state['properties']['number of posts'] = 0
+    folium.GeoJsonTooltip(['name', 'number of posts', 'average score']).add_to(cp.geojson)
     folium.LayerControl().add_to(m)
 
 def get_state_geo():
@@ -46,5 +56,12 @@ def get_state_geo():
     state_geo = json.load(state_geo_f)
     return state_geo
 
-create_Choropleth()
+def create_states_dict():
+    with open('StateSubreddits.csv') as f:
+        next(f)  # Skip the header
+        reader = csv.reader(f, skipinitialspace=True)
+        states_dict = dict(reader)
+    return states_dict
 
+m = create_Choropleth()
+m.save("state_choropleth.html")

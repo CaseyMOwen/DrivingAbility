@@ -6,3 +6,6 @@ config.py
 venv
 *.parquet
 .streamlit
+pytorchtest.py
+Querier.py
+RedditAPI.py

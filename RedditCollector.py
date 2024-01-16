@@ -38,9 +38,10 @@ class RedditCollector:
     def update_local_comments_data(self, max_num_posts):
         existing_comments_df = self.read_local_comments_data()
         existing_posts_df = self.read_local_posts_data()
+        subreddit_counts =  existing_posts_df.groupby('subreddit')['subreddit'].transform('count')
         comment_dfs = []
         # print(existing_posts_df)
-        post_ids = list(existing_posts_df.index.values)
+        post_ids = list(existing_posts_df.sample(frac=1, weights=subreddit_counts).index.values)
         post_count = 0
         existing_comments_list = existing_comments_df['post_id'].to_list()
         for post_id in post_ids:
@@ -49,7 +50,8 @@ class RedditCollector:
             if post_id in existing_comments_list:
                 continue
             else:
-                comment_df = self.get_comments(post_id)
+                post_subreddit = existing_posts_df.loc[post_id,'subreddit']
+                comment_df = self.get_comments(post_id, post_subreddit)
                 post_count += 1
                 comment_dfs.append(comment_df)
         full_df = pd.concat(comment_dfs)
@@ -74,13 +76,13 @@ class RedditCollector:
             df = pd.read_parquet(self.local_comments_data_file)
             df.index.name = 'id'
         else:
-            df = pd.DataFrame(columns=['body', 'post_id'])
+            df = pd.DataFrame(columns=['body', 'post_id', "subreddit", "parent_id"])
             df.index.name = 'id'
         return df
     
     def get_subreddit_posts(self, subreddit, limit=None):
         submission_df_entries = []
-        for submission in self.reddit.subreddit(subreddit).new(limit=limit):
+        for submission in self.reddit.subreddit(subreddit).hot(limit=limit):
             submission_df_entry = pd.DataFrame.from_dict({
                 "id":[submission.id],
                 "title":[anyascii(submission.title)],
@@ -97,30 +99,60 @@ class RedditCollector:
         s3 = boto3.resource('s3', region_name=config.AWS_DEFAULT_REGION,aws_access_key_id=config.AWS_ACCESS_KEY_ID, aws_secret_access_key=config.AWS_SECRET_ACCESS_KEY)
         s3.Bucket(bucketname).upload_file(local_filename,s3_filename)
 
-    def get_comments(self, post_id):
-        print(f'getting comments for post {post_id}')
+    def get_comments(self, post_id, subreddit):
+        print(f'getting comments for post {post_id} in subreddit {subreddit}')
         submission = self.reddit.submission(post_id)
         submission.comments.replace_more(limit=None)
         comment_df_entries = []
         for comment in submission.comments.list():
+            parent_id_prefixed = comment.parent_id
+            parent_type, parent_id = parent_id_prefixed.split('_', 1)
             comment_df_entry = pd.DataFrame.from_dict({
                 "id":[comment.id],
                 "body":[anyascii(comment.body)],
-                "post_id":[comment.submission.id]
+                "post_id":[comment.submission.id],
+                "subreddit":[subreddit],
+                "parent_type": [parent_type],
+                "parent_id":[parent_id]
             }).set_index('id')
             comment_df_entries.append(comment_df_entry)
         if not comment_df_entries:
-            comment_df = None
+            comment_df_with_context = None
         else:
             comment_df = pd.concat(comment_df_entries)
-        return comment_df
+            comment_df_with_context = self.build_comment_context(comment_df, submission)
+        return comment_df_with_context
+    
+    # Where df is the comment_df of a single post
+    def build_comment_context(self, df, submission):
+        df['context'] = None
+        num_comments_remaining = df.shape[0]
+        while num_comments_remaining > 0:
+            for comment_id in df.index:
+                context = df.loc[comment_id, 'context']
+                # Top level comment case
+                if df.loc[comment_id, 'parent_type'] == 't3':
+                    df.loc[comment_id, 'context'] = "Title: " + anyascii(submission.title)
+                    num_comments_remaining -= 1
+                elif context is None:
+                    parent_context = df.loc[df.loc[comment_id, 'parent_id'], 'context']
+                    if parent_context is not None:
+                        parent_body = df.loc[df.loc[comment_id, 'parent_id'], 'body']
+                        new_context = parent_context + " Reply: " + parent_body
+                        df.loc[comment_id, 'context'] = new_context
+                        num_comments_remaining -= 1
+        return df
 
+
+        
 
 state_subreddits_df = pd.read_csv('StateSubreddits.csv')
 state_subreddits_list = state_subreddits_df['Subreddit'].to_list()
 rc = RedditCollector(state_subreddits_list,'post_data.parquet', 'comments_data.parquet')
-rc.update_local_post_data()
-# rc.update_local_comments_data(10)
-# rc.write_s3('post_data.parquet', config.AWS_BUCKET_NAME, 'post_data.parquet')
-# print(rc.read_local_comments_data())
-print(rc.read_local_posts_data())
+# rc.update_local_post_data()
+rc.update_local_comments_data(100)
+# # rc.write_s3('post_data.parquet', config.AWS_BUCKET_NAME, 'post_data.parquet')
+df = rc.read_local_comments_data()
+df.to_csv('test_comment_context.csv')
+# print(df)
+# print(rc.read_local_posts_data())
