@@ -3,8 +3,8 @@ import folium
 import json
 import csv
 
-def create_Choropleth():
-    cp_df = create_choropleth_data()
+def create_Choropleth(data_df):
+    cp_df = create_choropleth_data(data_df)
     # print(id_list)
     state_geo = get_state_geo()
     m = folium.Map(location=[40, -96.5], zoom_start=4, min_zoom=3)
@@ -24,17 +24,17 @@ def create_Choropleth():
     add_choropleth_tooltip(cp_df, cp, m)
     return m
 
-def create_choropleth_data():
+def create_choropleth_data(data_df):
     states_dict = create_states_dict()
     inv_states_dict = {v: k for k, v in states_dict.items()}
-    df = pd.read_parquet('scored_post_data.parquet')
-    df['State'] = df['subreddit'].map(inv_states_dict)
-    grouped = df.groupby("State")
+    # df = pd.read_parquet('scored_post_data.parquet')
+    data_df['State'] = data_df['subreddit'].map(inv_states_dict)
+    grouped = data_df.groupby("State")
     cp_df = grouped['sum_score'].mean().reset_index(name="Average Score")
     # print(df.groupby("State").count().reset_index())
     # print(df)
     # print(df.value_counts("State"))
-    num_posts = df.value_counts("State").reset_index(name='Number of Posts')
+    num_posts = data_df.value_counts("State").reset_index(name='Number of Posts')
     cp_df = cp_df.merge(num_posts, on='State')
     return cp_df
 
@@ -63,5 +63,5 @@ def create_states_dict():
         states_dict = dict(reader)
     return states_dict
 
-m = create_Choropleth()
-m.save("state_choropleth.html")
+# m = create_Choropleth()
+# m.save("state_choropleth.html")

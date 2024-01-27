@@ -23,7 +23,9 @@ class RedditCollector:
         # self.posts_df = self.read_local_posts_data()
 
 
-    def update_local_post_data(self, limit=None):      
+    def update_local_post_data(self, limit=None):
+        if limit == 0:
+            return
         existing_df = self.read_local_posts_data()
         subreddit_dfs = []
         for i, subreddit in enumerate(self.subreddit_list):
@@ -36,12 +38,15 @@ class RedditCollector:
         merged_df.to_parquet(self.local_posts_data_file)
 
     def update_local_comments_data(self, max_num_posts):
+        if max_num_posts == 0:
+            return
         existing_comments_df = self.read_local_comments_data()
         existing_posts_df = self.read_local_posts_data()
         subreddit_counts =  existing_posts_df.groupby('subreddit')['subreddit'].transform('count')
         comment_dfs = []
         # print(existing_posts_df)
         post_ids = list(existing_posts_df.sample(frac=1, weights=subreddit_counts).index.values)
+        # post_ids = ['1abk4qw']
         post_count = 0
         existing_comments_list = existing_comments_df['post_id'].to_list()
         for post_id in post_ids:
@@ -81,6 +86,8 @@ class RedditCollector:
         return df
     
     def get_subreddit_posts(self, subreddit, limit=None):
+        if limit==0:
+            return None
         submission_df_entries = []
         for submission in self.reddit.subreddit(subreddit).hot(limit=limit):
             submission_df_entry = pd.DataFrame.from_dict({
@@ -94,10 +101,7 @@ class RedditCollector:
         submission_df = pd.concat(submission_df_entries)
         return submission_df
     
-    # Writes an existing local file to s3
-    def write_s3(self, local_filename, bucketname, s3_filename):
-        s3 = boto3.resource('s3', region_name=config.AWS_DEFAULT_REGION,aws_access_key_id=config.AWS_ACCESS_KEY_ID, aws_secret_access_key=config.AWS_SECRET_ACCESS_KEY)
-        s3.Bucket(bucketname).upload_file(local_filename,s3_filename)
+
 
     def get_comments(self, post_id, subreddit):
         print(f'getting comments for post {post_id} in subreddit {subreddit}')
@@ -150,9 +154,9 @@ state_subreddits_df = pd.read_csv('StateSubreddits.csv')
 state_subreddits_list = state_subreddits_df['Subreddit'].to_list()
 rc = RedditCollector(state_subreddits_list,'post_data.parquet', 'comments_data.parquet')
 # rc.update_local_post_data()
-rc.update_local_comments_data(100)
+# rc.update_local_comments_data(100)
 # # rc.write_s3('post_data.parquet', config.AWS_BUCKET_NAME, 'post_data.parquet')
-df = rc.read_local_comments_data()
-df.to_csv('test_comment_context.csv')
+# df = rc.read_local_comments_data()
+# df.to_csv('test_comment_context.csv')
 # print(df)
 # print(rc.read_local_posts_data())

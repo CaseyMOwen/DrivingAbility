@@ -11,13 +11,16 @@ import streamlit_folium as sf
 # Create connection object and retrieve file contents.
 # Specify input format is a csv and to cache the result for 600 seconds.
 conn = st.connection('s3', type=FilesConnection)
-# df = conn.read("caseyowendrivingdata/post_data.parquet", input_format="parquet")
-df = pd.read_parquet('scored_post_data.parquet')
+# df = conn.read("caseyowendrivingdata/post_data.parquet", input_format="parquet", ttl=600)
+# conn
+post_df = pd.read_parquet('scored_post_data.parquet')
+comment_df = pd.read_parquet('scored_comment_data.parquet')
 
 # Print results.
 # print(df.iloc[:1])
-st.write(df.iloc[:1])
-st.write(df)
+# st.write(df.iloc[:1])
+st.write(post_df)
+st.write(comment_df)
 
 # id_list = df.groupby("subreddit").count()['id']
 # print(id_list)
@@ -25,8 +28,13 @@ st.write(df)
 
 st.title('Reddit Driving Confidence vs. Ability')
 
-m = Visualizations.create_Choropleth()
-st_data = sf.folium_static(m)
+st.title("Post data")
+m1 = Visualizations.create_Choropleth(post_df)
+st_data1 = sf.folium_static(m1)
+
+st.title("Comment data")
+m2 = Visualizations.create_Choropleth(comment_df)
+st_data2 = sf.folium_static(m2)
 
 
 
