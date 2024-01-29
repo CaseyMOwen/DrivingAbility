@@ -30,7 +30,7 @@ def create_choropleth_data(data_df):
     # df = pd.read_parquet('scored_post_data.parquet')
     data_df['State'] = data_df['subreddit'].map(inv_states_dict)
     grouped = data_df.groupby("State")
-    cp_df = grouped['sum_score'].mean().reset_index(name="Average Score")
+    cp_df = grouped['tot_score'].mean().reset_index(name="Average Score")
     # print(df.groupby("State").count().reset_index())
     # print(df)
     # print(df.value_counts("State"))

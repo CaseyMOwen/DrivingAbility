@@ -4,6 +4,8 @@ import RedditCollector
 import os.path
 import torch
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
+import numpy as np
+from sklearn import preprocessing
 
 class Analyzer():
     def __init__(self, posts_df, comments_df, local_scored_posts_file, local_scored_comments_file):
@@ -13,7 +15,19 @@ class Analyzer():
                     #   model="facebook/bart-large-mnli")
         self.local_scored_posts_file = local_scored_posts_file
         self.local_scored_comments_file = local_scored_comments_file
-        self.candidate_labels = ['drivers', 'complaining', 'my state has bad drivers']
+        self.labels = {
+            'drivers': 'pos',
+            'complaining': 'pos',
+            'license':'neg',
+            'idiot': 'pos',
+            'DMV':'neg',
+            'ticket':'neg',
+            'insurance':'neg',
+            'politics':'neg',
+            'weather':'neg',
+            'conditions': 'neg',
+            'gas':'neg',
+        }
         self.tokenizer = AutoTokenizer.from_pretrained('facebook/bart-large-mnli')
         self.device = 'cuda'
         with torch.device(self.device):
@@ -21,8 +35,6 @@ class Analyzer():
         
         
     def score_text(self, label, text):
-        label = 'driving'
-        # premise = 'Drivers here are the worst'
         hypothesis = f'This example is {label}.'
 
         # run through model pre-trained on MNLI
@@ -53,13 +65,22 @@ class Analyzer():
             if post_id in existing_posts_list:
                 continue
             print(f'scoring post {post_id}, number {count}')
-            subreddit = self.posts_df.loc[post_id, 'subreddit']
-            post_classified_df_entry = self.score_post(post_id, subreddit)
+            # subreddit = self.posts_df.loc[post_id, 'subreddit']
+            post_classified_df_entry = self.score_post(post_id)
             post_classified_df_entries.append(post_classified_df_entry)
             count += 1
         full_df = pd.concat(post_classified_df_entries)
         merged_df = pd.concat([full_df, existing_scored_df])
         merged_df = merged_df[~merged_df.index.duplicated(keep='first')]
+        min_max_scaler = preprocessing.MinMaxScaler()
+        # merged_df['pos_score_norm'] = min_max_scaler.fit_transform(merged_df['pos_score'])
+        # merged_df = merged_df.assign(pos_score_norm=pd.Series(min_max_scaler.fit_transform(merged_df['pos_score'])).values)
+        # merged_df = merged_df.assign(neg_score_norm=pd.Series(min_max_scaler.fit_transform(merged_df['neg_score'])).values)
+
+        merged_df['pos_score_norm'] = min_max_scaler.fit_transform(merged_df[['pos_score']])
+        merged_df['neg_score_norm'] = min_max_scaler.fit_transform(merged_df[['neg_score']])
+        # merged_df['neg_score_norm'] = min_max_scaler.fit_transform(merged_df['neg_score'])
+        merged_df["tot_score"] = merged_df["pos_score_norm"] - merged_df["neg_score_norm"]
         merged_df.to_parquet(self.local_scored_posts_file)
 
     def update_score_comments(self, max_num_comments):
@@ -78,13 +99,22 @@ class Analyzer():
             if comment_id in existing_comments_list:
                 continue
             print(f'scoring comment {comment_id}, number {count}')
-            subreddit = self.comments_df.loc[comment_id, 'subreddit']
-            comment_classified_df_entry = self.score_comment(comment_id, subreddit)
+            # subreddit = self.comments_df.loc[comment_id, 'subreddit']
+            comment_classified_df_entry = self.score_comment(comment_id)
             comment_classified_df_entries.append(comment_classified_df_entry)
             count += 1
         full_df = pd.concat(comment_classified_df_entries)
         merged_df = pd.concat([full_df, existing_scored_df])
         merged_df = merged_df[~merged_df.index.duplicated(keep='first')]
+        min_max_scaler = preprocessing.MinMaxScaler()
+        merged_df['pos_score_norm'] = min_max_scaler.fit_transform(merged_df[['pos_score']])
+        merged_df['neg_score_norm'] = min_max_scaler.fit_transform(merged_df[['neg_score']])
+        # merged_df['pos_score_norm'] = min_max_scaler.fit_transform(merged_df['pos_score'])
+        # merged_df['neg_score_norm'] = min_max_scaler.fit_transform(merged_df['neg_score'])
+
+        # merged_df = merged_df.assign(pos_score_norm=pd.Series(min_max_scaler.fit_transform(merged_df['pos_score'])).values)
+        # merged_df = merged_df.assign(neg_score_norm=pd.Series(min_max_scaler.fit_transform(merged_df['neg_score'])).values)
+        merged_df["tot_score"] = merged_df["pos_score_norm"] - merged_df["neg_score_norm"]
         merged_df.to_parquet(self.local_scored_comments_file)
 
     def read_local_scored_posts_data(self):
@@ -105,60 +135,48 @@ class Analyzer():
             df.index.name = 'id'
         return df
 
+    def get_scores(self, text_to_classify):
+        # candidate_labels = ['drivers', 'complaining', 'license, registration, DMV', 'politics', 'complaining about drivers in their state']
+        label_scores = {}
+        pos_score = 0
+        neg_score = 0
+        for label in self.labels:
+            score = self.score_text(label, text_to_classify)
+            label_scores[label] = score
+            if self.labels[label] == 'pos':
+                pos_score += score
+            elif self.labels[label] == 'neg':
+                neg_score += score
+        return label_scores, pos_score, neg_score
 
-
-    def score_post(self, post_id, subreddit):
+    
+    def score_post(self, post_id):
         text_to_classify = self.posts_df.loc[post_id, 'title'] + " " + self.posts_df.loc[post_id, 'selftext']
-        # candidate_labels = ['drivers', 'complaining', 'my state has bad drivers']
-        # return_dict = self.classifier(text_to_classify, self.candidate_labels, multi_label=True)
-
-        driver_score = self.score_text(self.candidate_labels[0], text_to_classify)
-        complaining_score = self.score_text(self.candidate_labels[1], text_to_classify)
-        bad_driver_score = self.score_text(self.candidate_labels[2], text_to_classify)
-        # complaining_score = return_dict['scores'][1]
-        # bad_driver_score = return_dict['scores'][2]
-        sum_score = driver_score + complaining_score + bad_driver_score
-        # bad_driving_classification = False
-        # if bad_driver_score >= 0.9 and bad_driver_score > good_driver_score:
-        #     bad_driving_classification = True
-        # TODO: don't store text again, join and project when necessary
-        post_scored_df_entry = pd.DataFrame.from_dict({
+        label_scores, pos_score, neg_score = self.get_scores(text_to_classify)
+        df_entry_dict = {
             "id":[post_id],
-            "text_to_classify":[text_to_classify],
-            "driving_score":[driver_score],
-            "complaining_score":[complaining_score],
-            "bad_driver_score":[bad_driver_score],
-            "sum_score":[sum_score],
-            "subreddit":[subreddit]
-            # "bad_driving_classificaiton":[bad_driving_classification]
-        }).set_index('id')
-        # print(f"scored post {post_id} as {sum_score}")
+            "pos_score":[pos_score],
+            "neg_score":[neg_score],
+        }
+        for label in label_scores:
+            col_name = label + '_score'
+            df_entry_dict[col_name] = label_scores[label]
+        post_scored_df_entry = pd.DataFrame.from_dict(df_entry_dict).set_index('id')
         return post_scored_df_entry
     
-    def score_comment(self, comment_id, subreddit):
+    def score_comment(self, comment_id):
         text_to_classify = self.comments_df.loc[comment_id, 'context'] + "Comment: " + self.comments_df.loc[comment_id, 'body']
-        # return_dict = self.classifier(text_to_classify, self.candidate_labels, multi_label=True)
-        # driver_score = return_dict['scores'][0]
-        # complaining_score = return_dict['scores'][1]
-        # bad_driver_score = return_dict['scores'][2]
-
-        driver_score = self.score_text(self.candidate_labels[0], text_to_classify)
-        complaining_score = self.score_text(self.candidate_labels[1], text_to_classify)
-        bad_driver_score = self.score_text(self.candidate_labels[2], text_to_classify)
-        sum_score = driver_score + complaining_score + bad_driver_score
-
-        # TODO: don't store text again, join and project when necessary
-        comment_scored_df_entry = pd.DataFrame.from_dict({
+        label_scores, pos_score, neg_score = self.get_scores(text_to_classify)
+        df_entry_dict = {
             "id":[comment_id],
-            "text_to_classify":[text_to_classify],
-            "driving_score":[driver_score],
-            "complaining_score":[complaining_score],
-            "bad_driver_score":[bad_driver_score],
-            "sum_score":[sum_score],
-            "subreddit":[subreddit]
-            # "bad_driving_classificaiton":[bad_driving_classification]
-        }).set_index('id')
-        # print(f"scored comment {comment_id} as {sum_score}")
+            "pos_score":[pos_score],
+            "neg_score":[neg_score],
+        }
+        for label in label_scores:
+            col_name = label + '_score'
+            df_entry_dict[col_name] = label_scores[label]
+        
+        comment_scored_df_entry = pd.DataFrame.from_dict(df_entry_dict).set_index('id')
         return comment_scored_df_entry
 
 

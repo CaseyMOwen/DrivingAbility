@@ -15,10 +15,12 @@ stats_filename = 'stats.json'
 
 
 def main():
+    num_posts, num_comments, num_scored_posts, num_scored_comments = get_file_stats()
+
     get_posts = 0
     get_comments = 0
     score_posts = 1000
-    score_comments = 0
+    score_comments = 1000
     update_local_files(get_posts,get_comments,score_posts,score_comments)
     # update_s3_if_needed()
     # print(get_last_modified(config.AWS_BUCKET_NAME))
@@ -55,6 +57,16 @@ def update_file_stats():
     stats["num_scored_comments"] = scored_comments_df.shape[0]
     with open(stats_filename, "w") as outfile:
         json.dump(stats, outfile)
+
+def get_file_stats():
+    f = open(stats_filename)
+    stats = json.load(f)
+    num_posts = stats["num_posts"]
+    num_comments = stats["num_comments"]
+    num_scored_posts = stats["num_scored_posts"]
+    num_scored_comments = stats["num_scored_comments"]
+    return num_posts, num_comments, num_scored_posts, num_scored_comments
+
 
 
 def scrape(posts_per_subreddit, num_posts_for_comments):

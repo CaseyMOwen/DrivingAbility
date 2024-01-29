@@ -13,12 +13,19 @@ import streamlit_folium as sf
 conn = st.connection('s3', type=FilesConnection)
 # df = conn.read("caseyowendrivingdata/post_data.parquet", input_format="parquet", ttl=600)
 # conn
-post_df = pd.read_parquet('scored_post_data.parquet')
-comment_df = pd.read_parquet('scored_comment_data.parquet')
+data_post_df = pd.read_parquet('post_data.parquet')
+data_comment_df = pd.read_parquet('comments_data.parquet')
+scored_post_df = pd.read_parquet('scored_post_data.parquet')
+scored_comment_df = pd.read_parquet('scored_comment_data.parquet')
 
+post_df = pd.merge(data_post_df, scored_post_df, on='id', how='inner')
+comment_df = pd.merge(data_comment_df, scored_comment_df, on='id', how='inner')
 # Print results.
 # print(df.iloc[:1])
 # st.write(df.iloc[:1])
+thresh = .675
+post_df["Classification"] = post_df['tot_score'] > thresh
+comment_df["Classification"] = comment_df['tot_score'] > thresh
 st.write(post_df)
 st.write(comment_df)
 
