@@ -17,7 +17,7 @@ stats_filename = 'stats.json'
 def main():
     get_posts = 0
     get_comments = 0
-    score_posts = 5
+    score_posts = 1000
     score_comments = 0
     update_local_files(get_posts,get_comments,score_posts,score_comments)
     # update_s3_if_needed()

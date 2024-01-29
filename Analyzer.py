@@ -2,18 +2,41 @@ from transformers import pipeline
 import pandas as pd
 import RedditCollector
 import os.path
+import torch
+from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
 class Analyzer():
     def __init__(self, posts_df, comments_df, local_scored_posts_file, local_scored_comments_file):
         self.posts_df = posts_df
         self.comments_df = comments_df
-        self.classifier = pipeline("zero-shot-classification",
-                      model="facebook/bart-large-mnli")
+        # self.classifier = pipeline("zero-shot-classification",
+                    #   model="facebook/bart-large-mnli")
         self.local_scored_posts_file = local_scored_posts_file
         self.local_scored_comments_file = local_scored_comments_file
         self.candidate_labels = ['drivers', 'complaining', 'my state has bad drivers']
+        self.tokenizer = AutoTokenizer.from_pretrained('facebook/bart-large-mnli')
+        self.device = 'cuda'
+        with torch.device(self.device):
+            self.nli_model = AutoModelForSequenceClassification.from_pretrained('facebook/bart-large-mnli', torch_dtype=torch.float16)
         
         
+    def score_text(self, label, text):
+        label = 'driving'
+        # premise = 'Drivers here are the worst'
+        hypothesis = f'This example is {label}.'
+
+        # run through model pre-trained on MNLI
+        x = self.tokenizer.encode(text, hypothesis, return_tensors='pt',
+                            truncation='only_first')
+        logits = self.nli_model(x.to(self.device))[0]
+
+        # we throw away "neutral" (dim 1) and take the probability of
+        # "entailment" (2) as the probability of the label being true 
+        entail_contradiction_logits = logits[:,[0,2]]
+        probs = entail_contradiction_logits.softmax(dim=1)
+        prob_label_is_true = probs[:,1].item()
+        return prob_label_is_true
+
     def update_score_posts(self, max_num_posts):
         if max_num_posts == 0:
             return
@@ -87,10 +110,13 @@ class Analyzer():
     def score_post(self, post_id, subreddit):
         text_to_classify = self.posts_df.loc[post_id, 'title'] + " " + self.posts_df.loc[post_id, 'selftext']
         # candidate_labels = ['drivers', 'complaining', 'my state has bad drivers']
-        return_dict = self.classifier(text_to_classify, self.candidate_labels, multi_label=True)
-        driver_score = return_dict['scores'][0]
-        complaining_score = return_dict['scores'][1]
-        bad_driver_score = return_dict['scores'][2]
+        # return_dict = self.classifier(text_to_classify, self.candidate_labels, multi_label=True)
+
+        driver_score = self.score_text(self.candidate_labels[0], text_to_classify)
+        complaining_score = self.score_text(self.candidate_labels[1], text_to_classify)
+        bad_driver_score = self.score_text(self.candidate_labels[2], text_to_classify)
+        # complaining_score = return_dict['scores'][1]
+        # bad_driver_score = return_dict['scores'][2]
         sum_score = driver_score + complaining_score + bad_driver_score
         # bad_driving_classification = False
         # if bad_driver_score >= 0.9 and bad_driver_score > good_driver_score:
@@ -106,15 +132,21 @@ class Analyzer():
             "subreddit":[subreddit]
             # "bad_driving_classificaiton":[bad_driving_classification]
         }).set_index('id')
+        # print(f"scored post {post_id} as {sum_score}")
         return post_scored_df_entry
     
     def score_comment(self, comment_id, subreddit):
         text_to_classify = self.comments_df.loc[comment_id, 'context'] + "Comment: " + self.comments_df.loc[comment_id, 'body']
-        return_dict = self.classifier(text_to_classify, self.candidate_labels, multi_label=True)
-        driver_score = return_dict['scores'][0]
-        complaining_score = return_dict['scores'][1]
-        bad_driver_score = return_dict['scores'][2]
+        # return_dict = self.classifier(text_to_classify, self.candidate_labels, multi_label=True)
+        # driver_score = return_dict['scores'][0]
+        # complaining_score = return_dict['scores'][1]
+        # bad_driver_score = return_dict['scores'][2]
+
+        driver_score = self.score_text(self.candidate_labels[0], text_to_classify)
+        complaining_score = self.score_text(self.candidate_labels[1], text_to_classify)
+        bad_driver_score = self.score_text(self.candidate_labels[2], text_to_classify)
         sum_score = driver_score + complaining_score + bad_driver_score
+
         # TODO: don't store text again, join and project when necessary
         comment_scored_df_entry = pd.DataFrame.from_dict({
             "id":[comment_id],
@@ -126,6 +158,7 @@ class Analyzer():
             "subreddit":[subreddit]
             # "bad_driving_classificaiton":[bad_driving_classification]
         }).set_index('id')
+        # print(f"scored comment {comment_id} as {sum_score}")
         return comment_scored_df_entry
 
 
