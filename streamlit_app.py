@@ -5,7 +5,6 @@ from st_files_connection import FilesConnection
 import Visualizations
 import streamlit_folium as sf
 import webdav
-import config
 import requests
 import io
 import datetime
