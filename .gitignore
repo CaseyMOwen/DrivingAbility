@@ -10,3 +10,4 @@ pytorchtest.py
 Querier.py
 RedditAPI.py
 .vscode
+data

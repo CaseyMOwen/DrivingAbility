@@ -6,19 +6,27 @@ import config
 import boto3
 from datetime import datetime, timezone
 import json
+import os.path
 
-posts_filename = 'post_data.parquet'
-comments_filename = 'comments_data.parquet'
-scored_posts_filename = 'scored_post_data.parquet'
-scored_comments_filename = 'scored_comment_data.parquet'
-stats_filename = 'stats.json'
+posts_filename = 'data/post_data.csv'
+comments_filename = 'data/comment_data.csv'
+scored_posts_filename = 'data/scored_post_data.csv'
+scored_comments_filename = 'data/scored_comment_data.csv'
+stats_filename = 'data/stats.json'
 
 
 def main():
+    print(f'Starting Run - {datetime.now(timezone.utc)}')
     num_posts, num_comments, num_scored_posts, num_scored_comments = get_file_stats()
-
     get_posts = 0
-    get_comments = 0
+    get_comments = 100
+    posts_last_modified = datetime.fromtimestamp(os.path.getmtime(posts_filename))
+    if posts_last_modified.date() < datetime.now(timezone.utc).date():
+        # If posts data is older than a day, fill up on posts data, and skip comments for now to reduce API calls
+        print("Getting new posts")
+        get_posts = 1000
+        get_comments = 0
+    
     score_posts = 1000
     score_comments = 1000
     update_local_files(get_posts,get_comments,score_posts,score_comments)
@@ -27,6 +35,7 @@ def main():
     update_file_stats()
     # df = pd.read_parquet(scored_comments_filename)
     # df.to_csv('test_scored_comment_data.csv')
+    print(f'Finished Run - {datetime.now(timezone.utc)}')
 
 def update_s3_if_needed():
     today = datetime.now(timezone.utc).date()

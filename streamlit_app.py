@@ -4,19 +4,40 @@ import numpy as np
 from st_files_connection import FilesConnection
 import Visualizations
 import streamlit_folium as sf
-
-
-
+import webdav
+import config
+import requests
+import io
+import datetime
 
 # Create connection object and retrieve file contents.
 # Specify input format is a csv and to cache the result for 600 seconds.
-conn = st.connection('s3', type=FilesConnection)
+# conn = st.connection('s3', type=FilesConnection)
 # df = conn.read("caseyowendrivingdata/post_data.parquet", input_format="parquet", ttl=600)
 # conn
-data_post_df = pd.read_parquet('post_data.parquet')
-data_comment_df = pd.read_parquet('comments_data.parquet')
-scored_post_df = pd.read_parquet('scored_post_data.parquet')
-scored_comment_df = pd.read_parquet('scored_comment_data.parquet')
+
+@st.cache_data(ttl=datetime.timedelta(hours=1))
+def read_csv(filename):
+    url = st.secrets["webdav_server"] + '/remote.php/dav/files/' + st.secrets["webdav_username"] + '/Repos/DrivingAbility/data/' + filename
+    auth = (st.secrets["webdav_username"], st.secrets["webdav_password"])
+    try:
+        r = requests.get(url=url, auth=auth)
+        r.raise_for_status()
+    except requests.exceptions.HTTPError as err:
+        raise SystemExit(err)
+    data = r.content.decode('utf-8')
+    df = pd.read_csv(io.StringIO(data))
+    return df
+
+data_post_df = webdav.read_csv('post_data.csv')
+data_comment_df = webdav.read_csv('comment_data.csv')
+scored_post_df = webdav.read_csv('scored_post_data.csv')
+scored_comment_df = webdav.read_csv('scored_comment_data.csv')
+
+# data_post_df = pd.read_parquet('post_data.parquet')
+# data_comment_df = pd.read_parquet('comments_data.parquet')
+# scored_post_df = pd.read_parquet('scored_post_data.parquet')
+# scored_comment_df = pd.read_parquet('scored_comment_data.parquet')
 
 post_df = pd.merge(data_post_df, scored_post_df, on='id', how='inner')
 comment_df = pd.merge(data_comment_df, scored_comment_df, on='id', how='inner')

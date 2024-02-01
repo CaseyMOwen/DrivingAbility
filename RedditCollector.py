@@ -150,9 +150,9 @@ class RedditCollector:
 
         
 
-state_subreddits_df = pd.read_csv('StateSubreddits.csv')
-state_subreddits_list = state_subreddits_df['Subreddit'].to_list()
-rc = RedditCollector(state_subreddits_list,'post_data.parquet', 'comments_data.parquet')
+# state_subreddits_df = pd.read_csv('StateSubreddits.csv')
+# state_subreddits_list = state_subreddits_df['Subreddit'].to_list()
+# rc = RedditCollector(state_subreddits_list,'post_data.parquet', 'comments_data.parquet')
 # rc.update_local_post_data()
 # rc.update_local_comments_data(100)
 # # rc.write_s3('post_data.parquet', config.AWS_BUCKET_NAME, 'post_data.parquet')

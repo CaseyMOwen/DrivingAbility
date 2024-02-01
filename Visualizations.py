@@ -12,12 +12,12 @@ def create_Choropleth(data_df):
     geo_data=state_geo,
     name="choropleth",
     data=cp_df,
-    columns=["State", "Average Score"],
+    columns=["State", "Percent of Posts"],
     key_on="feature.properties.name",
     fill_color="YlGn",
     fill_opacity=0.7,
     line_opacity=0.2,
-    legend_name="Average Score",
+    legend_name="Percent of Posts Complaining",
     ).add_to(m)
 
     # m.save("state_choropleth.html")
@@ -30,12 +30,20 @@ def create_choropleth_data(data_df):
     # df = pd.read_parquet('scored_post_data.parquet')
     data_df['State'] = data_df['subreddit'].map(inv_states_dict)
     grouped = data_df.groupby("State")
-    cp_df = grouped['tot_score'].mean().reset_index(name="Average Score")
+    cp_df = grouped['Classification'].mean().reset_index(name="Percent of Posts")
     # print(df.groupby("State").count().reset_index())
     # print(df)
     # print(df.value_counts("State"))
-    num_posts = data_df.value_counts("State").reset_index(name='Number of Posts')
+    num_posts = data_df.value_counts("State").reset_index(name='Number of Posts Collected')
     cp_df = cp_df.merge(num_posts, on='State')
+    # filtered_true = data_df[data_df['Classification' == True]]
+    num_complaining = data_df[data_df['Classification'] == True].value_counts("State").reset_index(name='Number of Posts Complaining')
+    # print(cp_df)
+    # print(num_complaining)
+    cp_df = cp_df.merge(num_complaining, on='State', how='outer')
+    # print(cp_df)
+    # cp_df = cp_df.merge(num_posts, on='State')
+    # print(cp_df)
     return cp_df
 
 def add_choropleth_tooltip(cp_df, cp, m):
@@ -43,12 +51,14 @@ def add_choropleth_tooltip(cp_df, cp, m):
     for state in cp.geojson.data['features']:
         state_name = state['properties']['name']
         if state_name in cp_df_state_indexed.index:
-            state['properties']['average score'] = float(cp_df_state_indexed.loc[state_name, 'Average Score'])
-            state['properties']['number of posts'] = float(cp_df_state_indexed.loc[state_name, 'Number of Posts'])
+            state['properties']['percent of posts'] = float(cp_df_state_indexed.loc[state_name, 'Percent of Posts'])
+            state['properties']['number of posts collected'] = float(cp_df_state_indexed.loc[state_name, 'Number of Posts Collected'])
+            state['properties']['number of posts complaining'] = float(cp_df_state_indexed.loc[state_name, 'Number of Posts Complaining'])
         else:
-            state['properties']['average score'] = 0
-            state['properties']['number of posts'] = 0
-    folium.GeoJsonTooltip(['name', 'number of posts', 'average score']).add_to(cp.geojson)
+            state['properties']['percent of posts'] = 0
+            state['properties']['number of posts collected'] = 0
+            state['properties']['number of posts complaining'] = 0
+    folium.GeoJsonTooltip(['name', 'number of posts collected', 'percent of posts', 'number of posts complaining']).add_to(cp.geojson)
     folium.LayerControl().add_to(m)
 
 def get_state_geo():
