@@ -1,8 +1,4 @@
 config.py
-*.json
-*.csv
-!CitySubreddits.csv
-!StateSubreddits.csv
 venv
 *.parquet
 .streamlit
@@ -10,4 +6,6 @@ pytorchtest.py
 Querier.py
 RedditAPI.py
 .vscode
+data
+__pycache__
 data
