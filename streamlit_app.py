@@ -27,10 +27,10 @@ def read_csv(filename):
     df = pd.read_csv(io.StringIO(data))
     return df
 
-data_post_df = webdav.read_csv('post_data.csv')
-data_comment_df = webdav.read_csv('comment_data.csv')
-scored_post_df = webdav.read_csv('scored_post_data.csv')
-scored_comment_df = webdav.read_csv('scored_comment_data.csv')
+data_post_df = read_csv('post_data.csv')
+data_comment_df = read_csv('comment_data.csv')
+scored_post_df = read_csv('scored_post_data.csv')
+scored_comment_df = read_csv('scored_comment_data.csv')
 
 # data_post_df = pd.read_parquet('post_data.parquet')
 # data_comment_df = pd.read_parquet('comments_data.parquet')
